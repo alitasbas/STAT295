@@ -1,0 +1,265 @@
+---
+title: "Ali Taşbaş, Nida Karataş, Mehmet Enes Özkalay HW"
+author: "Ali Taşbaş, Nida Karataş, Mehmet Enes Özkalay"
+date: "April 18, 2024"
+output: html_document
+---
+
+## Question 1
+
+#### **i.**
+
+```{r}
+# alini@Anonymous ~
+# $ mkdir STAT295-HW
+
+# alini@Anonymous ~
+# $ cd STAT295-HW/
+
+# alini@Anonymous ~/STAT295-HW
+# $ wget https://raw.githubusercontent.com/dhavalpotdar/College-Scorecard-Data-Analysis/master/MERGED_2017_2018_cleaned.csv
+
+# alini@Anonymous ~/STAT295-HW
+# $ mv MERGED_2017_2018_cleaned.csv college_score.csv
+
+# alini@Anonymous ~/STAT295-HW
+# $ sed -n '10,60p' college_score.csv
+```
+
+#### **ii.**
+
+```{r}
+# alini@Anonymous ~/STAT295-HW
+# $ awk -F, '{if ($3=="Montgomery"&&$8=="Public") {print}}' college_score.csv >> subsample.csv
+
+
+```
+
+#### **iii.**
+
+```{r}
+# alini@Anonymous ~/STAT295-HW
+# $ cut -d, -f3 college_score.csv | sort | uniq -c
+```
+
+## Question 2
+
+#### **i.**
+
+```{r}
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(httr)
+library(xml2)
+library(rvest)
+library(leaflet)
+
+df <- read.csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-18/chocolate.csv")
+
+head(df, 6)
+
+str(df)
+```
+
+The data is in normal format. It contains information about chocolates produced. There 2530 observation with 10 attributes each. ref is our primary key. company_manufacturer, cocoa_percent, and rating are our quantitative variables. However, I will change some columns' data types. Rating is a scale between 1 and 4.
+
+#### **ii.**
+
+```{r}
+df %<>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(cocoa_percent = as.numeric(sub("%", "", cocoa_percent)))
+
+str(df)
+```
+
+#### **iii.**
+
+```{r}
+df %>% 
+  group_by(company_location) %>% 
+  reframe(rating_mean = mean(rating, na.rm = TRUE),
+            rating_sdev = sd(rating, na.rm = TRUE),
+            rating_median = median(rating),
+            rating_range = max(rating) - min(rating)
+            ) %>% 
+  slice(1:10)
+```
+Chile seems to have only 1 observation. Ratings are around 3.25. Belgium has a very high range. Bolivia and Belgium have the highest standard deviations.
+
+#### **iv.**
+
+```{r}
+df %>% filter(review_date == "2020" & country_of_bean_origin == "Colombia")
+```
+
+#### **v.**
+
+```{r}
+df %>% 
+  group_by(company_location) %>% 
+  summarize(mean_rating = mean(rating), 
+            mean_cocoa = mean(cocoa_percent))
+```
+
+#### **vi.**
+
+```{r}
+df %>% 
+  select(starts_with("co")) %>% 
+  select_if(is.factor) %>% 
+  slice(1:10)
+```
+
+#### **vii.**
+
+```{r}
+df %>% 
+  filter(company_location == "Switzerland" & between(rating,3.25,3.5) ) %>% 
+  slice(1:5)
+```
+
+#### **viii.**
+
+```{r}
+df %>% 
+  group_by(company_location) %>% 
+  summarize(mean_rating = mean(rating)) %>% 
+  arrange(desc(mean_rating))
+```
+
+#### ix.
+
+```{r}
+df %>% 
+  filter(company_manufacturer == "Bonnat") %>% 
+  group_by(country_of_bean_origin) %>% 
+  summarize(count = n())
+```
+
+#### **x.**
+
+```{r}
+df %>% 
+  mutate(rating_percentage = rating * 25,
+         class = ifelse(rating_percentage > 87.5, "Excellent", ifelse(rating_percentage > 50, "Tasty", ifelse(rating_percentage >= 25, "Medium", "Low")))) %>% 
+  select(rating, rating_percentage, class) %>% 
+  slice(1:25)
+
+# df %>%
+#   mutate(Rating_Percantage = rating * 25,
+#          Class = case_when(
+#            Rating_Percantage < 25 ~ "Low",
+#            Rating_Percantage >= 25 & Rating_Percantage <= 50 ~ "Medium",
+#            Rating_Percantage > 50 & Rating_Percantage <= 87.5 ~ "Tasty",
+#            Rating_Percantage > 87.5 ~ "Excellent"
+#          ))
+```
+
+## Question 3
+
+#### **i.**
+
+```{r}
+nmmaps <- read.csv("https://www.cedricscherer.com/data/chicago-nmmaps-custom.csv")
+
+nmmaps %<>%
+  mutate(date = as.Date(date))
+```
+
+```{r}
+nmmaps %>% ggplot(aes(x = date, y = temp)) +
+  geom_point(color = "skyblue2") +
+  geom_smooth(color = "brown2") +
+  facet_wrap(~year, scales = "free") +
+  labs(x = "Date", y = "Temperature", 
+       title = "Temperature by Year") +
+  theme_light()
+```
+
+We see the same pattern across the years; around July, the temperature is at its highest level near 75. The lowest observation is always in January around 0 degrees.
+
+#### **ii.**
+
+```{r}
+nmmaps %>% ggplot(aes(x = date, y = temp, color = season)) +
+  geom_point() +
+  labs(x = "Date", y = "Temperature", title = "Relationship Between Date, Temperature, and Season") +
+  theme_light()
+```
+
+Summer has very lowest variation. The daily temperatures are strictly greater than 50. Also, notice Autumn ends colder every year. On average, spring is warmer than autumn. There are no significant differences across the years. On the other hand, differences between seasons are very visible.
+
+#### **iii.**
+
+```{r}
+nmmaps %>% ggplot(aes(temp, dewpoint)) +
+  geom_point(color = "salmon") + 
+  geom_smooth(method = "lm", se = F, color="skyblue2")
+
+cor <- round(cor(nmmaps$temp, nmmaps$dewpoint), 3)
+```
+
+Correlation is **`r cor`** This is a significant value. This indicates an almost perfect linear positive relationship between temperature and dewpoint. As temperature increases, dewpoint also tends to increase.
+
+## Question 4
+
+#### **Data Collection**:
+
+```{r}
+url <- "https://en.wikipedia.org/wiki/2014_FIFA_World_Cup_venues"
+
+res <- GET(url)
+
+html_con <- content(res, "text")
+
+html_ulke <- read_html(html_con)
+
+tables <- html_ulke %>% 
+  html_nodes("table") %>% 
+  html_table() # extract all tables from the webpage
+
+stadiums <- as.data.frame(tables[[3]])
+stadiums <- stadiums[-13, ]
+
+br <- as.data.frame(read.csv("https://raw.githubusercontent.com/alitasbas/STAT295/main/br.csv"))
+br <- br[, 1:3]
+colnames(br) <- c("City", "Lat", "Lng")
+
+br_coord <- as.data.frame(left_join(stadiums, br, by="City"))
+br_coord <- br_coord[-c(3, 4, 5, 8, 9, 10)]
+
+# manually :enter Cuiabá coordinates
+br_coord[6, 5:6] <- list(-15.5954, -56.0926)
+
+print(br_coord)
+```
+
+#### **Mapping**:
+
+```{r}
+wc_icon <- makeIcon(iconUrl = "https://p7.hiclipart.com/preview/68/154/413/2022-fifa-world-cup-2018-fifa-world-cup-2014-fifa-world-cup-2010-fifa-world-cup-unofficial-football-world-championships-football.jpg",
+                iconWidth = 20, iconHeight = 31,
+                iconAnchorX = 10, iconAnchorY = 14)
+
+br_coord %>% 
+  leaflet() %>% 
+  addProviderTiles("Esri") %>% 
+  addMarkers(~Lng, ~Lat,
+             label = ~City,
+             popup = paste0(
+               "<b>City: </b>",
+               br_coord$City,
+               "<br>",
+               "<b>Stadium: </b>",
+               br_coord$Stadium,
+               "<br>",
+               "<b>Average Attendance: </b>",
+               br_coord[["Averageattendanceper match"]]), 
+             icon = wc_icon) %>% 
+  setView(lng = -48,
+          lat = -15,
+          zoom = 3)
+  
+```
